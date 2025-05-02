@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    container_name: diplom-database
+    restart: always
+    volumes:
+      - diplom-postgresql:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: diplom
+      POSTGRES_USER: diplom
+      POSTGRES_DB: diplom
+    ports:
+      - "5432:5432"
+
+  django:
+    build:
+      context: .
+    restart: always
+    volumes:
+      - ./app:/app
+      - ./static:/static
+    depends_on:
+      - db
+    working_dir: /app
+    command: [ "/wait-for-it.sh", "db:5432", "--", "../start-dev.sh" ]
+    ports:
+      - "8000:8000"
+
+volumes:
+    diplom-postgresql:

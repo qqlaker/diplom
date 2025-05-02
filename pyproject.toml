@@ -1,0 +1,169 @@
+[tool.poetry]
+name = "diplom"
+version = "0.1.0"
+description = ""
+authors = ["qqlaker <skeglz@mail.ru>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+djangorestframework = "^3.15.2"
+Django = "^5.1.6"
+environs = "^14.1.1"
+gunicorn = "^23.0.0"
+psycopg = { extras = ["binary", "pool"], version = "^3.1.18" }
+uritemplate = "^4.1.1"
+pytest = "^8.1.1"
+pytest-cov = "^6.1.1"
+pytest-django = "^4.8.0"
+django-simple-history = "^3.8.0"
+drf-spectacular = "^0.28.0"
+celery = "^5.4.0"
+redis = "^5.2.1"
+django-celery-beat = "^2.7.0"
+django-celery-results = "^2.5.1"
+django-jazzmin = "^3.0.1"
+drf-writable-nested = "^0.7.1"
+django-filter = "^24.3"
+loguru = "^0.7.3"
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^3.7.0"
+django-stubs = "^4.2.7"
+ruff = "^0.5.7"
+pip-audit="^2.7.3"
+pytest-randomly = "^3.15.0"
+faker = "^28.4.1"
+factory-boy = "^3.3.1"
+mypy = "^1.15.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.coverage.run]
+omit = [
+    "**/admin.py",
+    "**/admin/**",
+    "**/tests/**",
+    "**/migrations/**",
+    "**/management/**",
+    "**/urls.py",
+    "**/__init__/**",
+    "**/settings/**",
+    "manage.py",
+    "asgi.py",
+    "wsgi.py",
+]
+
+[tool.mypy]
+plugins = "mypy_django_plugin.main"
+
+[tool.django-stubs]
+django_settings_module = "app.settings.base"
+
+[tool.ruff]
+target-version = "py311"
+src = ["reaper"]
+line-length = 119
+unsafe-fixes = true
+extend-exclude = [
+    "docs/*",
+    ".venv",
+    "venv",
+    ".git",
+    ".ruff_cache",
+    ".vscode",
+    "migrations",
+]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "ARG002", # Unused method argument
+    "ANN", # Type annotations
+    "BLE001", # Blind exceptions
+    "COM812", # Trailing comma missing
+    "D", # Docstring
+    "DOC501",
+    "E501",  # line length
+    "FBT001", # Boolean-typed positional argument in function definition
+    "FBT002", # Boolean default positional argument in function definition
+    "N818", # Exception name should be named with Error suffix
+    "TD003",
+    "TRY003", # Avoid specifying long messages outside the exception class
+    "PLR6301", # Method could be a function, class method, or static method
+    "RUF001", # RUF001 String contains ambiguous `с`
+    "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar`
+    "RUF002"  # Docstring contains ambiguous `с` (CYRILLIC)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "S101", # Use of assert detected
+    "S106", # Possible hardcoded password assigned to argument
+]
+
+[tool.ruff.lint.isort]
+lines-after-imports = 2
+
+[tool.ruff.lint.pylint]
+max-args = 12
+max-public-methods = 10
+max-locals = 16
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.pylint.main]
+ignore = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "tests",
+    "migrations",
+    "settings",
+    "snapshots",
+]
+disable = [
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "unused-argument",
+    "redefined-builtin",
+    "import-outside-toplevel",
+    "no-else-return",
+    "unsubscriptable-object",
+    "abstract-method",
+]
+
+[tool.pylint.master]
+load-plugins=[
+    "pylint_django",
+    "pylint.extensions.for_any_all",
+    "pylint.extensions.consider_ternary_expression",
+    "pylint.extensions.mccabe",
+]
+django-settings-module = "app.settings.base"
+
+[tool.pylint.basic]
+good-names = ["i", "j", "k", "v", "ex", "pk", "r", "_"]
+
+[tool.pylint.design]
+max-args = 12
+max-locals = 16
+max-attributes = 30
+max-parents = 20
+min-public-methods = 0
+max-public-methods = 10
+max-branches = 15
+max-statements = 50
+max-bool-expr = 10
+max-returns = 10
+
+[tool.pylint.format]
+max-module-lines = 500

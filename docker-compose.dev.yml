@@ -1,0 +1,87 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: diplom-database
+    restart: always
+    volumes:
+      - diplom-postgresql:/var/lib/postgresql/data
+    env_file:
+      - ".env.dev"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  diplom:
+    build:
+      context: .
+    restart: always
+    volumes:
+      - ./app:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/mediafiles
+    env_file:
+      - ".env.dev"
+    depends_on:
+      - db
+    working_dir: /app
+    command: ["/wait-for-it.sh", "db:5432", "--", "../start-dev.sh"]
+    ports:
+      - "8000:8000"
+
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: [
+      "/wait-for-it.sh", "diplom:8000", "--timeout=200", "--", "celery", "-A",
+      "settings", "worker", "-l", "info", "--concurrency", "${CELERY_CONCURRENCY:-4}",
+    ]
+    env_file:
+      - ".env.dev"
+    volumes:
+      - ./app:/app
+    healthcheck:
+      test: ["CMD-SHELL", "celery", "-A", "settings", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: on-failure
+
+  beats:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["celery", "-A", "settings", "beat", "-l", "info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
+    env_file:
+      - ".env.dev"
+    volumes:
+      - ./app:/app
+    depends_on:
+      celery:
+        condition: service_healthy
+    restart: on-failure
+
+  redis:
+    image: redis:alpine
+    command: ["/bin/sh", "-c", "redis-server --requirepass $${REDIS_PASS:?REDIS_PASS variable is not set}"]
+    env_file:
+      - ".env.dev"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: on-failure
+
+
+volumes:
+  diplom-postgresql:
+  static_volume:
+  media_volume:
