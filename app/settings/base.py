@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "simple_history",
     "core",
+    "edu_programs",
 ]
 
 MIDDLEWARE = [
