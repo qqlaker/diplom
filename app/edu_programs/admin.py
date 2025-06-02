@@ -1,77 +1,118 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models.competencies import Competence, ProfessionalStandard
-from .models.curriculum import Discipline
-from .models.education import EducationalProgram
-from .models.institutions import Faculty, University
+from edu_programs.models import Competency, Discipline, Faculty, ProfessionalStandard, Program, University
 
 
+@admin.register(University)
 class UniversityAdmin(SimpleHistoryAdmin):
-    list_display = ("short_name", "name", "established")
-    list_display_links = ("short_name", "name")
-    search_fields = ("name", "short_name")
-    list_filter = ("established",)
-    ordering = ("name",)
+    list_display = ("name", "abbreviation", "location", "website")
+    search_fields = ("name", "abbreviation", "location")
+    list_filter = ("location",)
 
 
+@admin.register(Faculty)
 class FacultyAdmin(SimpleHistoryAdmin):
-    list_display = ("code", "name", "university")
-    list_display_links = ("code", "name")
-    search_fields = ("name", "code", "university__name")
+    list_display = ("name", "abbreviation", "university")
+    search_fields = ("name", "abbreviation", "university__name")
     list_filter = ("university",)
-    ordering = ("university__name", "name")
 
 
-class EducationalProgramAdmin(SimpleHistoryAdmin):
-    list_display = ("code", "name", "faculty", "degree", "is_active")
-    list_display_links = ("code", "name")
-    search_fields = ("name", "code", "faculty__name")
-    list_filter = ("faculty__university", "faculty", "degree", "is_active")
-    ordering = ("faculty__university__name", "faculty__name", "code")
-    date_hierarchy = "approval_date"
-    filter_horizontal = ()
-
-
-class DisciplineAdmin(SimpleHistoryAdmin):
-    list_display = ("code", "name", "program", "semester", "credits")
-    list_display_links = ("code", "name")
-    search_fields = ("name", "code", "program__name")
-    list_filter = ("program__faculty", "semester")
-    ordering = ("program__faculty__name", "semester", "code")
-    filter_horizontal = ("competences",)
-
-
-class CompetenceAdmin(SimpleHistoryAdmin):
-    list_display = ("code", "type", "program", "short_name")
-    list_display_links = ("code", "short_name")
-    search_fields = ("name", "code", "program__name")
-    list_filter = ("program__faculty", "type")
-    ordering = ("program__faculty__name", "code")
-
-    def short_name(self, obj):
-        return obj.name[:100] + "..." if len(obj.name) > 100 else obj.name  # noqa: PLR2004
-
-    short_name.short_description = "Формулировка"
-
-
+@admin.register(ProfessionalStandard)
 class ProfessionalStandardAdmin(SimpleHistoryAdmin):
-    list_display = ("code", "short_name", "registration_number", "approval_date")
-    list_display_links = ("code", "short_name")
-    search_fields = ("name", "code", "registration_number")
-    list_filter = ("approval_date",)
-    ordering = ("code",)
-    date_hierarchy = "approval_date"
-
-    def short_name(self, obj):
-        return obj.name[:100] + "..." if len(obj.name) > 100 else obj.name  # noqa: PLR2004
-
-    short_name.short_description = "Название"
+    list_display = ("code", "title", "domain", "order_number", "order_date")
+    search_fields = ("code", "title", "domain")
+    list_filter = ("domain", "order_date")
+    date_hierarchy = "order_date"
 
 
-admin.site.register(University, UniversityAdmin)
-admin.site.register(Faculty, FacultyAdmin)
-admin.site.register(EducationalProgram, EducationalProgramAdmin)
-admin.site.register(Discipline, DisciplineAdmin)
-admin.site.register(Competence, CompetenceAdmin)
-admin.site.register(ProfessionalStandard, ProfessionalStandardAdmin)
+@admin.register(Competency)
+class CompetencyAdmin(SimpleHistoryAdmin):
+    list_display = ("code", "type", "short_description")
+    search_fields = ("code", "description")
+    list_filter = ("type",)
+
+    def short_description(self, obj):
+        return obj.description[:70] + "..." if len(obj.description) > 70 else obj.description
+
+    short_description.short_description = "Описание"
+
+
+@admin.register(Discipline)
+class DisciplineAdmin(SimpleHistoryAdmin):
+    list_display = ("code", "name")
+    search_fields = ("code", "name")
+    filter_horizontal = ("competencies",)
+
+
+@admin.register(Program)
+class ProgramAdmin(SimpleHistoryAdmin):
+    list_display = (
+        "code",
+        "name",
+        "university",
+        "faculty",
+        "qualification",
+        "duration_years",
+        "approval_year",
+        "is_processed",
+    )
+    search_fields = ("code", "name", "university__name")
+    readonly_fields = ("is_processed", "processing_error")
+    actions = ["reprocess_documents"]
+    list_filter = (
+        "university",
+        "qualification",
+        "language",
+    )
+    filter_horizontal = (
+        "professional_standards",
+        "disciplines",
+    )
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "university",
+                    "faculty",
+                    "document",
+                    "is_processed",
+                    "code",
+                    "name",
+                    "profile",
+                    "approval_year",
+                ),
+            },
+        ),
+        (
+            "Квалификация",
+            {
+                "fields": ("qualification", "duration_years", "total_credits"),
+            },
+        ),
+        (
+            "Варианты обучения",
+            {
+                "fields": (
+                    "language",
+                    "contact_hours_min",
+                ),
+            },
+        ),
+        (
+            "Профессиональные стандарты и дисциплины",
+            {
+                "fields": ("professional_standards", "disciplines"),
+            },
+        ),
+    )
+
+    def reprocess_documents(self, request, queryset):
+        for program in queryset:
+            if program.document:
+                program.is_processed = False
+                program.save()
+        self.message_user(request, "Выбранные программы будут обработаны повторно")
+
+    reprocess_documents.short_description = "Переобработать документы"

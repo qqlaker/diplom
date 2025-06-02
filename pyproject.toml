@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "diplom"
-version = "0.1.0"
+version = "0.2.0"
 description = ""
 authors = ["qqlaker <skeglz@mail.ru>"]
 license = "MIT"
@@ -26,6 +26,10 @@ django-jazzmin = "^3.0.1"
 drf-writable-nested = "^0.7.1"
 django-filter = "^24.3"
 loguru = "^0.7.3"
+pymupdf = "^1.26.0"
+python-docx = "^1.1.2"
+pandas = "^2.2.3"
+rapidfuzz = "^3.13.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.7.0"
@@ -92,8 +96,10 @@ ignore = [
     "N818", # Exception name should be named with Error suffix
     "TD003",
     "TRY003", # Avoid specifying long messages outside the exception class
+    "PD901", # Avoid using the generic variable name `df` for DataFrames
     "PLR6301", # Method could be a function, class method, or static method
     "RUF001", # RUF001 String contains ambiguous `с`
+    "RUF003", # Comment contains ambiguous `о`
     "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar`
     "RUF002"  # Docstring contains ambiguous `с` (CYRILLIC)
 ]

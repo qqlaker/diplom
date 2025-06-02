@@ -37,8 +37,19 @@ services:
       context: .
       dockerfile: Dockerfile
     command: [
-      "/wait-for-it.sh", "diplom:8000", "--timeout=200", "--", "celery", "-A",
-      "settings", "worker", "-l", "info", "--concurrency", "${CELERY_CONCURRENCY:-4}",
+      "/wait-for-it.sh",
+      "diplom:8000",
+      "--timeout=200",
+      "--",
+      "celery",
+      "-A", "settings",
+      "worker",
+      "-l", "info",
+      "--concurrency", "${CELERY_CONCURRENCY:-4}",
+      "-Ofair",
+      "--prefetch-multiplier=1",
+      "-Q",
+      "documents,default"
     ]
     env_file:
       - ".env.dev"
@@ -51,20 +62,6 @@ services:
       retries: 10
     depends_on:
       redis:
-        condition: service_healthy
-    restart: on-failure
-
-  beats:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: ["celery", "-A", "settings", "beat", "-l", "info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
-    env_file:
-      - ".env.dev"
-    volumes:
-      - ./app:/app
-    depends_on:
-      celery:
         condition: service_healthy
     restart: on-failure
 

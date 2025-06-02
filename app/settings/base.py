@@ -1,5 +1,9 @@
+import locale
 from os import getenv
 from pathlib import Path
+
+
+locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,7 +29,6 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django_celery_beat",
     "django_celery_results",
     "django_filters",
     "rest_framework",
@@ -33,7 +36,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "simple_history",
     "core",
-    "edu_programs",
+    "edu_programs.apps.EduProgramsConfig",
 ]
 
 MIDDLEWARE = [
@@ -53,7 +56,7 @@ ROOT_URLCONF = "settings.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -97,13 +100,15 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-LANGUAGE_CODE = "ru-RU"
+LANGUAGE_CODE = "ru-ru"
 
 TIME_ZONE = "Europe/Moscow"
 
 USE_I18N = True
 
 USE_TZ = True
+
+USE_L10N = True
 
 
 CELERY_RESULT_BACKEND = "django-db"
@@ -113,6 +118,24 @@ CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "Europe/Moscow"
+CELERY_ENABLE_UTC = True
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60
+
+CELERY_TASK_QUEUES = {
+    "documents": {
+        "exchange": "high_priority",
+        "exchange_type": "direct",
+        "routing_key": "high_priority",
+        "queue_arguments": {"x-max-priority": 10},
+    },
+    "default": {
+        "exchange": "default",
+        "exchange_type": "direct",
+        "routing_key": "default",
+        "queue_arguments": {"x-max-priority": 10},
+    },
+}
 
 CELERY_TASK_ACKS_LATE = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 4
@@ -175,4 +198,16 @@ JAZZMIN_SETTINGS = {
         "success": "btn-success",
     },
     "actions_sticky_top": False,
+}
+
+
+ANALYTICS_CONFIG = {
+    "DEMAND_WEIGHTS": {
+        "employment": 0.6,
+        "disciplines": 0.4,
+    },
+    "UNIQUE_WEIGHTS": {
+        "competencies": 0.7,
+        "disciplines": 0.3,
+    },
 }
