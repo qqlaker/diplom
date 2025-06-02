@@ -1,0 +1,127 @@
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>{% trans "Отчёт по образовательной программе" %} {{ program.code|default:"ID "}}{{ program.id }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1, h2 {
+            color: #333;
+            text-align: center;
+        }
+        table {
+            width: 80%;
+            border-collapse: collapse;
+            margin: 20px auto;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h1>{% trans "Отчёт по образовательной программе" %}</h1>
+    <h2>{{ program.code|default:"—" }} - {{ program.name|default:"—" }}</h2>
+
+    <h2>{% trans "Общая информация" %}</h2>
+    <table>
+        <tr><th>{% trans "Код" %}</th><td>{{ program.code|default:"—" }}</td></tr>
+        <tr><th>{% trans "Название" %}</th><td>{{ program.name|default:"—" }}</td></tr>
+        <tr><th>{% trans "Профиль" %}</th><td>{{ program.profile|default:"—" }}</td></tr>
+        <tr><th>{% trans "Квалификация" %}</th><td>{{ program.qualification|default:"—" }}</td></tr>
+        <tr><th>{% trans "Университет" %}</th><td>{{ program.university.name|default:"—" }}</td></tr>
+        <tr><th>{% trans "Факультет" %}</th><td>{{ program.faculty.name|default:"—" }}</td></tr>
+        <tr><th>{% trans "Год утверждения" %}</th><td>{{ program.approval_year|default:"—" }}</td></tr>
+        <tr><th>{% trans "Срок обучения" %}</th><td>{{ program.duration_years|default:"—" }} {% trans "лет" %}</td></tr>
+        <tr><th>{% trans "Зачётные единицы" %}</th><td>{{ program.total_credits|default:"—" }}</td></tr>
+        <tr><th>{% trans "Язык обучения" %}</th><td>{{ program.language|default:"—" }}</td></tr>
+        <tr><th>{% trans "Контактные часы" %}</th><td>{{ program.contact_hours_min|default:"—" }}</td></tr>
+        <tr><th>{% trans "Документ" %}</th><td>{{ program.document|default:"—" }}</td></tr>
+        <tr><th>{% trans "Обработан" %}</th><td>{{ program.is_processed|yesno:"Да,Нет" }}</td></tr>
+        <tr><th>{% trans "Ошибка обработки" %}</th><td>{{ program.processing_error|default:"—" }}</td></tr>
+    </table>
+
+    <h2>{% trans "Профессиональные стандарты" %}</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>{% trans "Код" %}</th>
+                <th>{% trans "Название" %}</th>
+                <th>{% trans "Сфера деятельности" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for standard in standards %}
+                <tr>
+                    <td>{{ standard.code }}</td>
+                    <td>{{ standard.title }}</td>
+                    <td>{{ standard.domain }}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="3">{% trans "Нет данных" %}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>{% trans "Дисциплины" %}</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>{% trans "Код" %}</th>
+                <th>{% trans "Название" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for discipline in disciplines %}
+                <tr>
+                    <td>{{ discipline.code }}</td>
+                    <td>{{ discipline.name }}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="2">{% trans "Нет данных" %}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>{% trans "Компетенции" %}</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>{% trans "Код" %}</th>
+                <th>{% trans "Описание" %}</th>
+                <th>{% trans "Тип" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for competency in competencies %}
+                <tr>
+                    <td>{{ competency.competencies__code }}</td>
+                    <td>{{ competency.competencies__description }}</td>
+                    <td>{{ competency.competencies__type }}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="3">{% trans "Нет данных" %}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

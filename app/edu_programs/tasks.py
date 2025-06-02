@@ -137,7 +137,7 @@ def process_uploaded_document(self, program_id: int):  # noqa: ARG001
         logger.exception(f"Ошибка обработки программы {program_id}: {e!s}", exc_info=True)  # noqa: G004, G202, TRY401
         program.is_processed = False
         program.processing_error = str(e)
-        program.save()
+        program.save(error=True)
 
     else:
         return True

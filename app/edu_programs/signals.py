@@ -9,8 +9,11 @@ from edu_programs.models import Program
 
 
 @receiver(post_save, sender=Program)
-def start_document_processing(sender, instance, created, **kwargs):  # noqa: ANN001, ANN003, ARG001
+def start_document_processing(sender, instance, created, **kwargs):  # noqa: ARG001
     """Автоматически запускает обработку документа при его добавлении/изменении."""
+    if instance.processing_error:
+        return
+
     if instance.document and not instance.is_processed:
         # Запускаем асинхронную задачу обработки документа
         current_app.send_task(
@@ -21,10 +24,10 @@ def start_document_processing(sender, instance, created, **kwargs):  # noqa: ANN
 
 
 @receiver(post_delete, sender=Program)
-def auto_delete_file_on_delete(sender, instance, **kwargs):  # noqa: ANN001, ANN003, ARG001
+def auto_delete_file_on_delete(sender, instance, **kwargs):  # noqa: ARG001
     """Удаляет файл из файловой системы при удалении объекта Program."""
-    if instance.document and Path.is_file(instance.document.path):
+    if instance.document and Path(instance.document.path).is_file():
         try:
-            Path.unlink(instance.document.path)
+            Path(instance.document.path).unlink()
         except Exception as e:
             logger.error(f"Ошибка при удалении файла {instance.document.path}: {e}")

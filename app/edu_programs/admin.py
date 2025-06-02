@@ -33,7 +33,7 @@ class CompetencyAdmin(SimpleHistoryAdmin):
     list_filter = ("type",)
 
     def short_description(self, obj):
-        return obj.description[:70] + "..." if len(obj.description) > 70 else obj.description
+        return obj.description[:70] + "..." if len(obj.description) > 70 else obj.description  # noqa: PLR2004
 
     short_description.short_description = "Описание"
 
@@ -58,7 +58,7 @@ class ProgramAdmin(SimpleHistoryAdmin):
         "is_processed",
     )
     search_fields = ("code", "name", "university__name")
-    readonly_fields = ("is_processed", "processing_error")
+    readonly_fields = ("processing_error",)
     actions = ["reprocess_documents"]
     list_filter = (
         "university",
@@ -104,6 +104,12 @@ class ProgramAdmin(SimpleHistoryAdmin):
             "Профессиональные стандарты и дисциплины",
             {
                 "fields": ("professional_standards", "disciplines"),
+            },
+        ),
+        (
+            "Ошибки",
+            {
+                "fields": ("processing_error",),
             },
         ),
     )

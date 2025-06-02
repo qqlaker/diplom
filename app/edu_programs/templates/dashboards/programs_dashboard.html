@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% load static i18n %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <h1 class="text-center">{% trans "Направления подготовки" %}</h1>
+
+    <!-- Filters -->
+    <form method="GET" class="filter-form">
+        <div class="filter-group">
+            <label for="faculties">{% trans "Факультеты" %}:</label>
+            <select name="faculties" id="faculties" multiple>
+                {% for faculty in faculties %}
+                    <option value="{{ faculty.id }}" {% if faculty.id in selected_faculties %}selected{% endif %}>
+                        {{ faculty.abbreviation }} - {{ faculty.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="qualification">{% trans "Квалификация" %}:</label>
+            <select name="qualification" id="qualification">
+                <option value="">{% trans "Все" %}</option>
+                <option value="бакалавриат" {% if qualification == 'бакалавриат' %}selected{% endif %}>{% trans "Бакалавриат" %}</option>
+                <option value="магистратура" {% if qualification == 'магистратура' %}selected{% endif %}>{% trans "Магистратура" %}</option>
+                <option value="специалитет" {% if qualification == 'специалитет' %}selected{% endif %}>{% trans "Специалитет" %}</option>
+            </select>
+        </div>
+        <div class="filter-buttons">
+            <button type="submit" class="btn btn-primary">{% trans "Применить фильтры" %}</button>
+            <a href="{% url 'programs_dashboard' %}" class="btn btn-secondary">{% trans "Сбросить фильтры" %}</a>
+        </div>
+    </form>
+
+    <!-- Pie Chart -->
+    <div class="chart-container">
+        <canvas id="programsChart"></canvas>
+    </div>
+
+    <!-- Programs Table -->
+    <h2 class="text-center">{% trans "Детализация направлений подготовки" %}</h2>
+    <table class="programs-table">
+        <thead>
+            <tr>
+                <th>{% trans "Код" %}</th>
+                <th>{% trans "Название" %}</th>
+                <th>{% trans "Квалификация" %}</th>
+                <th>{% trans "Факультет" %}</th>
+                <th>{% trans "Профиль" %}</th>
+                <th>{% trans "Проф. стандарты" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for program in programs %}
+                <tr {% if program.intersection_count > 1 %}class="highlight-intersection"{% endif %}>
+                    <td>{{ program.code|default:"—" }}</td>
+                    <td>{{ program.name|default:"—" }}</td>
+                    <td>{{ program.qualification|default:"—" }}</td>
+                    <td>{{ program.faculty.abbreviation }}</td>
+                    <td>{{ program.profile|default:"—" }}</td>
+                    <td>
+                        {% for standard in program.professional_standards.all %}
+                            {{ standard.title }}{% if not forloop.last %}, {% endif %}
+                        {% empty %}
+                            —
+                        {% endfor %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="7">{% trans "Нет данных для отображения" %}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Download Report Button -->
+    <div class="download-button">
+        <a href="{% url 'download_programs_report' %}?faculties={{ selected_faculties|join:',' }}&qualification={{ qualification|urlencode }}" class="btn btn-success">{% trans "Скачать отчёт" %}</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="{% static 'js/programs_dashboard.js' %}"></script>
+    <script>
+        const chartData = {{ chart_data|safe }};
+        console.log('Dashboard Chart Data:', chartData); // Debug
+        initializeProgramsChart(chartData);
+    </script>
+{% endblock %}

@@ -1,6 +1,6 @@
 from django.core.files.storage import FileSystemStorage
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.db.models import Count
 from django.utils.translation import gettext_lazy as _
 
 
@@ -103,7 +103,15 @@ class Program(models.Model):
     code = models.CharField(_("Код направления подготовки"), max_length=20, blank=True)
     name = models.CharField(_("Название направления подготовки"), max_length=255, blank=True)
     profile = models.TextField(_("Профиль образовательной программы"), blank=True)
-    approval_year = models.DateField(_("Год утверждения"), blank=True, null=True)
+    approval_year = models.IntegerField(
+        _("Год утверждения"),
+        blank=True,
+        null=True,
+        validators=[
+            MinValueValidator(1900),
+            MaxValueValidator(2100),
+        ],
+    )
     qualification = models.CharField(_("Присваиваемая квалификация"), max_length=100, blank=True)
     duration_years = models.IntegerField(_("Срок обучения в годах"), blank=True, null=True)
     total_credits = models.IntegerField(_("Общее количество зачётных единиц"), blank=True, null=True)
@@ -122,14 +130,13 @@ class Program(models.Model):
     document = models.FileField(
         _("Файл документа ОПОП"),
         upload_to="opop_documents/",
+        unique=True,
         storage=opop_storage,
         blank=True,
         null=True,
     )
     is_processed = models.BooleanField(_("Обработан"), default=False)
-    processing_error = models.TextField(_("Ошибка обработки"), blank=True, null=True)
-    applicants_count = models.IntegerField(_("Количество абитуриентов"), default=0)
-    graduates_employed = models.IntegerField(_("Трудоустроено выпускников"), default=0)
+    processing_error = models.TextField(_("Ошибка обработки"), blank=True, default="")
 
     class Meta:
         verbose_name = _("Образовательная программа")
@@ -140,7 +147,8 @@ class Program(models.Model):
 
     def save(self, *args, **kwargs):
         # При первом сохранении с документом сбрасываем флаг обработки
-        if self.document and not self.is_processed:
+        error = kwargs.pop("error", None)
+        if self.document and not self.is_processed and not error:
             self.is_processed = False
             self.processing_error = None
         super().save(*args, **kwargs)
@@ -149,40 +157,3 @@ class Program(models.Model):
         """Переопределяем метод delete для корректного удаления файла."""
         self.document.delete(save=False)  # Удаляет файл через storage
         super().delete(*args, **kwargs)
-
-    @property
-    def demand_score(self):
-        """Показатель востребованности."""
-        if self.applicants_count == 0:
-            return 0
-        employment_rate = self.graduates_employed / self.applicants_count * 100 if self.applicants_count > 0 else 0
-        return round(0.6 * employment_rate + 0.4 * (self.disciplines.count() / 10), 2)
-
-    @property
-    def uniqueness_score(self):
-        """Показатель уникальности."""
-        # Получаем все компетенции через дисциплины программы
-        competencies = Competency.objects.filter(discipline__program=self).distinct()
-
-        # Считаем уникальные компетенции (встречающиеся только в этой программе)
-        unique_competencies = (
-            competencies.annotate(
-                program_count=Count("discipline__program", distinct=True),
-            )
-            .filter(program_count=1)
-            .count()
-        )
-
-        # Считаем количество дисциплин в программе
-        disciplines_count = self.disciplines.count()
-
-        return round(0.7 * unique_competencies + 0.3 * disciplines_count, 2)
-
-    @property
-    def competitiveness(self):
-        """Общий показатель конкурентоспособности."""
-        return round(0.7 * self.demand_score + 0.3 * self.uniqueness_score, 2)
-
-    def update_metrics(self):
-        """Обновление всех показателей."""
-        self.save(update_fields=["demand_score", "uniqueness_score"])

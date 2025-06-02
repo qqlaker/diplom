@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "diplom"
-version = "0.2.0"
+version = "0.3.0"
 description = ""
 authors = ["qqlaker <skeglz@mail.ru>"]
 license = "MIT"
@@ -30,6 +30,7 @@ pymupdf = "^1.26.0"
 python-docx = "^1.1.2"
 pandas = "^2.2.3"
 rapidfuzz = "^3.13.0"
+weasyprint = "^65.1"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.7.0"
