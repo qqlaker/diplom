@@ -4,13 +4,6 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-
-#!/bin/bash
-
-set -o errexit
-set -o pipefail
-set -o nounset
-
 create_superuser() {
     echo "Creating superuser..."
     python manage.py shell -c "

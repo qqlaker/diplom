@@ -30,9 +30,10 @@ RUN chmod +x /wait-for-it.sh /start.sh /start-dev.sh
 
 # Установка Poetry и зависимостей
 COPY poetry.lock pyproject.toml /
-RUN pip install poetry==1.8.2 \
+RUN pip install --upgrade pip \
+    && pip install poetry==1.8.2 \
     && poetry config virtualenvs.create false \
-    && poetry install --no-dev --no-root
+    && poetry install --no-interaction --no-ansi --no-dev --no-root
 
 WORKDIR /app
 COPY app ./

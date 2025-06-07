@@ -115,7 +115,7 @@ def parse_fgos_education_standards(self):
 @shared_task(bind=True)
 def parse_vsu_education_programs(self):  # noqa: ARG001
     """Создает модели Program на основе данных с сайта ВУЗа."""
-    programs_data = extract_vsu_education_programs(download=False)
+    programs_data = extract_vsu_education_programs()
     university = University.objects.get(abbreviation="ВГУ")
 
     created_count = 0
