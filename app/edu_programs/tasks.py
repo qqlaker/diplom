@@ -2,142 +2,184 @@ import logging
 
 import fitz  # PyMuPDF
 from celery import shared_task
-from pandas import DataFrame
+from django.core.exceptions import ObjectDoesNotExist
+from django.core.files import File
 
-from edu_programs.models import Competency, Discipline, ProfessionalStandard, Program
-from edu_programs.pdf_parsers.base import find_page_with_text
-from edu_programs.pdf_parsers.competencies import extract_competencies
-from edu_programs.pdf_parsers.content import (
-    check_and_update_page_numbers,
-    extract_content_to_pandas,
+from edu_programs.models import (
+    EducationGroup,
+    EduDegree,
+    FederalStateEducationStandard,
+    ProfessionalStandard,
+    ProfessionalStandardGroup,
+    Program,
+    University,
 )
-from edu_programs.pdf_parsers.disciplines import extract_disciplines
-from edu_programs.pdf_parsers.prof_standards import extract_professional_standards
-from edu_programs.pdf_parsers.program_info import extract_program_info
+from edu_programs.parsers.pdf_parsers import vsu_document_parser
+from edu_programs.parsers.web_parsers import (
+    extract_fgos_education_standards,  # парсинг программ с сайта фгос
+    extract_fgos_professional_standards,  # парсинг стандартов с сайта фгос
+    extract_vsu_education_programs,  # парсинг с сайта вгу
+)
 
 
 logger = logging.getLogger(__name__)
 
 
-def save_competencies(competencies_data: dict):
-    """Сохраняет компетенции в базу данных и связывает с программой."""
-    saved_competencies = {}
-
-    for comp_type, df in competencies_data.items():
-        for _, row in df.iterrows():
-            code = row["Код"].strip()
-            description = row["Формулировка компетенции"].strip()
-
-            competency, _created = Competency.objects.update_or_create(
-                code=code,
-                defaults={
-                    "type": comp_type,
-                    "description": description,
-                },
-            )
-            saved_competencies[code] = competency
-
-    return saved_competencies
-
-
-def save_professional_standards(standards_df: DataFrame, program: Program):
-    """Сохраняет профессиональные стандарты и связывает с программой."""
-    saved_standards = {}
+def save_professional_standards(standards_df, program):
+    """Связывает профессиональные стандарты с программой."""
+    if standards_df is None or standards_df.empty:
+        return
 
     for _, row in standards_df.iterrows():
-        code = row["Код профессионального стандарта"].strip()
-        title = row["Название"].strip()
-        domain = row["Сфера деятельности"].strip()
-        order_number = row["Номер приказа утверждения"].strip()
-        order_date = row["Дата утверждения"].date()
-
-        standard, created = ProfessionalStandard.objects.update_or_create(
-            code=code,
-            defaults={
-                "title": title,
-                "domain": domain,
-                "order_number": order_number,
-                "order_date": order_date,
-            },
-        )
-        saved_standards[code] = standard
-        program.professional_standards.add(standard)
-
-    return saved_standards
-
-
-def save_disciplines(disciplines_df: DataFrame, saved_competencies: dict, program: Program):
-    """Сохраняет дисциплины и их связи с компетенциями и программой."""
-    saved_disciplines = {}
-
-    for _, row in disciplines_df.iterrows():
-        code = row["Код"].strip()
-        name = row["Название"].strip()
-
-        discipline, created = Discipline.objects.update_or_create(
-            code=code,
-            defaults={"name": name},
-        )
-
-        comp_codes = [c.strip() for c in row["Компетенции"].split(";") if c.strip()]
-        for comp_code in comp_codes:
-            if comp_code in saved_competencies:
-                discipline.competencies.add(saved_competencies[comp_code])
-
-        saved_disciplines[code] = discipline
-        program.disciplines.add(discipline)
-
-    return saved_disciplines
+        code = row["Код"].split(".")
+        group_code, code = code[0], code[1]
+        try:
+            standard = ProfessionalStandard.objects.get(code=code, professional_standard_group__code=group_code)
+            program.professional_standards.add(standard)
+        except ProfessionalStandard.DoesNotExist:
+            logger.warning(f"Профессиональный стандарт с кодом {group_code}.{code} не найден")
 
 
 @shared_task(bind=True)
-def process_uploaded_document(self, program_id: int):  # noqa: ARG001
-    logger.info(f"Обработка документа ID: {program_id} запущена")  # noqa: G004
-
+def parse_fgos_professional_standards(self):
+    """Создает модели ProfessionalStandard на основе данных с сайта ФГОС."""
     try:
-        program = Program.objects.get(id=program_id)
-        if not program.document or program.is_processed:
-            return True
+        standards_data = extract_fgos_professional_standards()
 
-        # Парсим документ
-        with fitz.open(program.document.path) as doc:
-            # Извлекаем содержание
-            content_page = find_page_with_text(doc, "содержание")
-            content_df = extract_content_to_pandas(content_page)
-            content_df = check_and_update_page_numbers(content_df, doc)
-
-            # Извлекаем данные
-            competencies = extract_competencies(doc, content_df)
-            professional_standards = extract_professional_standards(doc, content_df)
-            disciplines = extract_disciplines(doc, content_df)
-            program_info = extract_program_info(doc, content_df)
-
-        # Обновляем основную информацию о программе
-        program.code = program_info.get("Код направления", "")
-        program.name = program_info.get("Название направления", "")
-        program.profile = program_info.get("Профиль образовательной программы", "")
-        program.qualification = program_info.get("Присваиваемая квалификация", "")
-        program.duration_years = int(program_info.get("Срок обучения"))
-        program.total_credits = int(program_info.get("Общее количество зачётных единиц"))
-        program.language = program_info.get("Язык обучения", "Русский")
-        program.contact_hours_min = int(program_info.get("Минимальный объём контактной работы (в часах)"))
-        program.approval_year = program_info.get("Год утверждения")
-
-        # Сохраняем связанные данные
-        saved_competencies = save_competencies(competencies)
-        save_professional_standards(professional_standards, program)
-        save_disciplines(disciplines, saved_competencies, program)
-
-        # Помечаем программу как обработанную
-        program.is_processed = True
-        program.processing_error = None
-        program.save()
+        created_count = 0
+        for data in standards_data:
+            # Проверяем, существует ли уже стандарт с таким кодом
+            if not (
+                ProfessionalStandard.objects.filter(
+                    code=data["code"], professional_standard_group__name=data["group_name"]
+                )
+                .select_related("professional_standard_group__name")
+                .exists()
+            ):
+                group, _ = ProfessionalStandardGroup.objects.get_or_create(
+                    code=data["group_code"],
+                    defaults={"name": data["group_name"], "code": data["group_code"]},
+                )
+                ProfessionalStandard.objects.create(
+                    name=data["name"],
+                    professional_standard_group=group,
+                    code=data["code"],
+                )
+                created_count += 1
 
     except Exception as e:
-        logger.exception(f"Ошибка обработки программы {program_id}: {e!s}", exc_info=True)  # noqa: G004, G202, TRY401
-        program.is_processed = False
-        program.processing_error = str(e)
-        program.save(error=True)
+        logger.exception(f"Ошибка при парсинге профессиональных стандартов: {e}")  # noqa: TRY401
+        raise self.retry(exc=e) from None
 
     else:
-        return True
+        return f"Создано {created_count} профессиональных стандартов"
+
+
+@shared_task(bind=True)
+def parse_fgos_education_standards(self):
+    """Создает модели FederalStateEducationStandard на основе данных с сайта ФГОС."""
+    try:
+        standards_data = extract_fgos_education_standards()
+
+        created_count = 0
+        for data in standards_data:
+            # Проверяем, существует ли уже стандарт с таким кодом
+            if not (
+                FederalStateEducationStandard.objects.filter(
+                    code=data["code"], edu_degree__code=data["degree_code"], edu_group__code=data["group_code"]
+                )
+                .select_related("edu_degree__code", "edu_group__code")
+                .exists()
+            ):
+                edu_group, _ = EducationGroup.objects.get_or_create(
+                    code=data["group_code"],
+                    defaults={"name": data["group_name"], "code": data["group_code"]},
+                )
+                edu_degree = EduDegree.objects.get(code=data["degree_code"])
+                FederalStateEducationStandard.objects.create(
+                    name=data["name"],
+                    edu_group=edu_group,
+                    edu_degree=edu_degree,
+                    code=data["code"],
+                )
+                created_count += 1
+
+    except Exception as e:
+        logger.exception(f"Ошибка при парсинге образовательных стандартов: {e}")  # noqa: TRY401
+        raise self.retry(exc=e) from None
+
+    else:
+        return f"Создано {created_count} образовательных стандартов"
+
+
+@shared_task(bind=True)
+def parse_vsu_education_programs(self):  # noqa: ARG001
+    """Создает модели Program на основе данных с сайта ВУЗа."""
+    programs_data = extract_vsu_education_programs(download=False)
+    university = University.objects.get(abbreviation="ВГУ")
+
+    created_count = 0
+    for data in programs_data:
+        # Проверяем, существует ли уже программа с таким кодом
+        try:
+            if not (
+                Program.objects.filter(
+                    code=data["code"],
+                    edu_degree__code=data["degree_code"],
+                    edu_group__code=data["group_code"],
+                    profile=data.get("profile", ""),
+                )
+                .select_related("edu_degree__code", "edu_group__code")
+                .exists()
+                and data.get("file_path")
+            ):
+                data["file_path"].unlink()
+
+                with fitz.open(data["file_path"]) as doc:
+                    page_text = doc[0].get_text(sort=True)
+                    if not page_text:
+                        logger.info(f"{data['file_path']} | нет текста на странице")
+                        continue
+                    document_parse_data = vsu_document_parser(page_text, university)
+
+                if "faculty" not in document_parse_data:
+                    logger.warning(f"Факультет не найден | {data['file_path'].stem}")
+                    continue
+
+                try:
+                    edu_group = EducationGroup.objects.get(code=data["group_code"])
+                except ObjectDoesNotExist:
+                    logger.warning(f"Общая группа ОП - {data['group_code']} - отсутствует в базе")
+                    continue
+                edu_degree = EduDegree.objects.get(code=data["degree_code"])
+
+                with open(data["file_path"], "rb") as f:
+                    program = Program.objects.create(
+                        name=data["name"],
+                        edu_group=edu_group,
+                        edu_degree=edu_degree,
+                        code=data["code"],
+                        university=university,
+                        profile=data.get("profile", ""),
+                        approval_year=data.get("year"),
+                        document=File(f, name=data["file_path"].name),
+                        faculty=document_parse_data["faculty"],
+                    )
+                created_count += 1
+
+                # Сохраняем связанные проф.стандарты
+                save_professional_standards(document_parse_data["professional_standards"], program)
+
+                program.save()
+
+        except Exception as e:
+            logger.exception(f"Ошибка при парсинге образовательных программ: {e}")  # noqa: TRY401
+            continue
+
+    return f"Создано {created_count} образовательных программ"
+
+
+# Порядок запуска
+# 1) parse_fgos_professional_standards
+# 2) parse_fgos_education_standards
+# 3) parse_vsu_education_programs

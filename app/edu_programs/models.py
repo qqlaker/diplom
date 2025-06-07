@@ -1,18 +1,17 @@
+from core.models import BaseModel
 from django.core.files.storage import FileSystemStorage
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 
-# Кастомное хранилище для документов
+fgos_storage = FileSystemStorage(location="uploads/fgos/")
 opop_storage = FileSystemStorage(location="uploads/opop/")
 
 
-class University(models.Model):
+class University(BaseModel):
     name = models.CharField(_("Полное наименование вуза"), max_length=255)
-    abbreviation = models.CharField(_("Сокращённое название"), max_length=50)
-    location = models.CharField(_("Местоположение"), max_length=255)
-    website = models.URLField(_("Ссылка на официальный сайт"))
+    abbreviation = models.CharField(_("Сокращённое название"), max_length=50, unique=True)
 
     class Meta:
         verbose_name = _("Университет")
@@ -22,14 +21,14 @@ class University(models.Model):
         return self.abbreviation
 
 
-class Faculty(models.Model):
+class Faculty(BaseModel):
     university = models.ForeignKey(
         University,
         on_delete=models.CASCADE,
         verbose_name=_("ВУЗ"),
     )
     name = models.CharField(_("Полное название факультета"), max_length=255)
-    abbreviation = models.CharField(_("Сокращение"), max_length=50)
+    abbreviation = models.CharField(_("Сокращение"), max_length=50, unique=True)
 
     class Meta:
         verbose_name = _("Факультет")
@@ -39,92 +38,110 @@ class Faculty(models.Model):
         return self.abbreviation
 
 
-class ProfessionalStandard(models.Model):
+class ProfessionalStandardGroup(BaseModel):
+    name = models.CharField(_("Название группы"), max_length=255)
+    code = models.CharField(_("Код группы"), max_length=20, unique=True)
+
+    class Meta:
+        verbose_name = _("Обобщенная группа ПС")
+        verbose_name_plural = _("Обобщенные группы ПС")
+
+    def __str__(self):
+        return self.name
+
+
+class EducationGroup(BaseModel):
+    name = models.CharField(_("Название группы"), max_length=255)
+    code = models.CharField(_("Код группы"), max_length=20, unique=True)
+
+    class Meta:
+        verbose_name = _("Обобщенная группа ОП")
+        verbose_name_plural = _("Обобщенные группы ОП")
+
+    def __str__(self):
+        return self.name
+
+
+class ProfessionalStandard(BaseModel):
+    name = models.CharField(_("Название стандарта"), max_length=255)
+    professional_standard_group = models.ForeignKey(
+        ProfessionalStandardGroup,
+        on_delete=models.CASCADE,
+        verbose_name=_("Обобщенная группа проф-стандартов"),
+        max_length=255,
+    )
     code = models.CharField(_("Код профессионального стандарта"), max_length=20)
-    title = models.CharField(_("Название стандарта"), max_length=255)
-    domain = models.CharField(_("Сфера деятельности"), max_length=255)
-    order_number = models.CharField(_("Номер приказа утверждения"), max_length=50)
-    order_date = models.DateField(_("Дата утверждения"))
 
     class Meta:
         verbose_name = _("Профессиональный стандарт")
         verbose_name_plural = _("Профессиональные стандарты")
 
     def __str__(self):
-        return self.title
+        return self.name
 
 
-class Competency(models.Model):
-    COMPETENCY_TYPES = [
-        ("UK", _("Универсальная")),
-        ("OPK", _("Общепрофессиональная")),
-        ("PK", _("Профессиональная")),
-    ]
-
-    type = models.CharField(_("Тип компетенции"), max_length=3, choices=COMPETENCY_TYPES)
-    code = models.CharField(_("Код компетенции"), max_length=20)
-    description = models.TextField(_("Описание компетенции"))
+class EduDegree(BaseModel):
+    name = models.CharField(_("Наименование"), max_length=100)
+    code = models.CharField(_("Код степени образования"), max_length=20)
 
     class Meta:
-        verbose_name = _("Компетенция")
-        verbose_name_plural = _("Компетенции")
-
-    def __str__(self):
-        return f"{self.code} ({self.get_type_display()})"
-
-
-class Discipline(models.Model):
-    code = models.CharField(_("Код дисциплины"), max_length=20)
-    name = models.CharField(_("Название дисциплины"), max_length=255)
-    competencies = models.ManyToManyField(
-        Competency,
-        verbose_name=_("Компетенции"),
-    )
-
-    class Meta:
-        verbose_name = _("Дисциплина")
-        verbose_name_plural = _("Дисциплины")
+        verbose_name = _("Степень образования")
+        verbose_name_plural = _("Степень образования")
 
     def __str__(self):
         return self.name
 
 
-class Program(models.Model):
-    university = models.ForeignKey(
-        University,
+class FederalStateEducationStandard(BaseModel):  # образовательные программы с сайта ФГОС
+    name = models.CharField(_("Название"), max_length=255)
+    edu_group = models.ForeignKey(
+        EducationGroup,
         on_delete=models.CASCADE,
-        verbose_name=_("ВУЗ"),
+        verbose_name=_("Обобщенная группа образовательных программ"),
     )
-    faculty = models.ForeignKey(
-        Faculty,
-        on_delete=models.CASCADE,
-        verbose_name=_("Факультет"),
+    edu_degree = models.ForeignKey(
+        EduDegree, verbose_name=_("Степень образования"), on_delete=models.CASCADE, blank=True
     )
-    code = models.CharField(_("Код направления подготовки"), max_length=20, blank=True)
+    code = models.CharField(_("Код"), max_length=20)
+
+    class Meta:
+        verbose_name = _("Федеральный образовательный стандарт ФГОС")
+        verbose_name_plural = _("Федеральные образовательные стандарты ФГОС")
+
+    def __str__(self) -> str:
+        return (
+            f"{self.edu_group.code}.{self.edu_degree.code}.{self.code} - {self.name}"
+            if self.code
+            else f"Образовательный стандарт (ID: {self.id})"
+        )
+
+
+class Program(BaseModel):  # образовательные программы с сайта ВУЗов
     name = models.CharField(_("Название направления подготовки"), max_length=255, blank=True)
+    edu_group = models.ForeignKey(
+        EducationGroup,
+        on_delete=models.CASCADE,
+        verbose_name=_("Обобщенная группа образовательных программ"),
+    )
+    edu_degree = models.ForeignKey(
+        EduDegree, verbose_name=_("Степень образования"), on_delete=models.CASCADE, blank=True
+    )
+    code = models.CharField(_("Код"), max_length=20)
+    university = models.ForeignKey(University, on_delete=models.CASCADE, verbose_name=_("ВУЗ"))
+    faculty = models.ForeignKey(Faculty, on_delete=models.CASCADE, verbose_name=_("Факультет"))
     profile = models.TextField(_("Профиль образовательной программы"), blank=True)
     approval_year = models.IntegerField(
-        _("Год утверждения"),
+        _("Год начала подготовки"),
         blank=True,
         null=True,
         validators=[
             MinValueValidator(1900),
-            MaxValueValidator(2100),
+            MaxValueValidator(3000),
         ],
     )
-    qualification = models.CharField(_("Присваиваемая квалификация"), max_length=100, blank=True)
-    duration_years = models.IntegerField(_("Срок обучения в годах"), blank=True, null=True)
-    total_credits = models.IntegerField(_("Общее количество зачётных единиц"), blank=True, null=True)
-    language = models.CharField(_("Язык обучения"), max_length=100, blank=True)
-    contact_hours_min = models.IntegerField(_("Минимальный объём контактной работы (в часах)"), blank=True, null=True)
     professional_standards = models.ManyToManyField(
         ProfessionalStandard,
         verbose_name=_("Профессиональные стандарты"),
-        blank=True,
-    )
-    disciplines = models.ManyToManyField(
-        Discipline,
-        verbose_name=_("Дисциплины"),
         blank=True,
     )
     document = models.FileField(
@@ -135,23 +152,17 @@ class Program(models.Model):
         blank=True,
         null=True,
     )
-    is_processed = models.BooleanField(_("Обработан"), default=False)
-    processing_error = models.TextField(_("Ошибка обработки"), blank=True, default="")
 
     class Meta:
-        verbose_name = _("Образовательная программа")
-        verbose_name_plural = _("Образовательные программы")
+        verbose_name = _("Образовательная программа ВУЗа")
+        verbose_name_plural = _("Образовательные программы ВУЗов")
 
     def __str__(self) -> str:
-        return f"{self.code} - {self.name}" if self.code else f"Программа (ID: {self.id})"
-
-    def save(self, *args, **kwargs):
-        # При первом сохранении с документом сбрасываем флаг обработки
-        error = kwargs.pop("error", None)
-        if self.document and not self.is_processed and not error:
-            self.is_processed = False
-            self.processing_error = None
-        super().save(*args, **kwargs)
+        return (
+            f"{self.edu_group.code}.{self.edu_degree.code}.{self.code} - {self.name}"
+            if self.code
+            else f"Программа (ID: {self.id})"
+        )
 
     def delete(self, *args, **kwargs):
         """Переопределяем метод delete для корректного удаления файла."""

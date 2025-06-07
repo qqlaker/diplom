@@ -2,6 +2,8 @@ import locale
 from os import getenv
 from pathlib import Path
 
+from celery.schedules import timedelta
+
 
 locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
 
@@ -30,6 +32,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django_celery_results",
+    "django_celery_beat",
     "django_filters",
     "rest_framework",
     "rest_framework.authtoken",
@@ -56,7 +59,7 @@ ROOT_URLCONF = "settings.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],
+        "DIRS": [],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -142,7 +145,7 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 4
 
 
 STATIC_URL = "/static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
+STATIC_ROOT = BASE_DIR / "static"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "mediafiles"
@@ -209,5 +212,27 @@ ANALYTICS_CONFIG = {
     "UNIQUE_WEIGHTS": {
         "competencies": 0.7,
         "disciplines": 0.3,
+    },
+}
+
+
+CELERY_BEAT_SCHEDULE = {
+    "parse_fgos_professional_standards": {
+        "task": "edu_programs.tasks.parse_fgos_professional_standards",
+        "schedule": timedelta(days=1),
+        "options": {"queue": "default"},
+        "enabled": False,
+    },
+    "parse_fgos_education_standards": {
+        "task": "edu_programs.tasks.parse_fgos_education_standards",
+        "schedule": timedelta(days=1),
+        "options": {"queue": "default"},
+        "enabled": False,
+    },
+    "parse_vsu_education_programs": {
+        "task": "edu_programs.tasks.parse_vsu_education_programs",
+        "schedule": timedelta(days=1),
+        "options": {"queue": "default"},
+        "enabled": False,
     },
 }

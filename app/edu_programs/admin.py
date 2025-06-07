@@ -1,14 +1,23 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
-from edu_programs.models import Competency, Discipline, Faculty, ProfessionalStandard, Program, University
+from edu_programs.models import (
+    EducationGroup,
+    EduDegree,
+    Faculty,
+    FederalStateEducationStandard,
+    ProfessionalStandard,
+    ProfessionalStandardGroup,
+    Program,
+    University,
+)
 
 
 @admin.register(University)
 class UniversityAdmin(SimpleHistoryAdmin):
-    list_display = ("name", "abbreviation", "location", "website")
-    search_fields = ("name", "abbreviation", "location")
-    list_filter = ("location",)
+    list_display = ("name", "abbreviation")
+    search_fields = ("name", "abbreviation")
+    list_filter = ("name",)
 
 
 @admin.register(Faculty)
@@ -18,57 +27,81 @@ class FacultyAdmin(SimpleHistoryAdmin):
     list_filter = ("university",)
 
 
+@admin.register(ProfessionalStandardGroup)
+class ProfessionalStandardGroupAdmin(SimpleHistoryAdmin):
+    list_display = ("name", "code")
+    search_fields = ("name", "code")
+
+
+@admin.register(EducationGroup)
+class EducationGroupAdmin(SimpleHistoryAdmin):
+    list_display = ("name", "code")
+    search_fields = ("name", "code")
+
+
 @admin.register(ProfessionalStandard)
 class ProfessionalStandardAdmin(SimpleHistoryAdmin):
-    list_display = ("code", "title", "domain", "order_number", "order_date")
-    search_fields = ("code", "title", "domain")
-    list_filter = ("domain", "order_date")
-    date_hierarchy = "order_date"
+    list_display = ("full_code", "name", "code", "professional_standard_group")
+    search_fields = ("name", "code", "professional_standard_group__name")
+    list_filter = ("professional_standard_group",)
+
+    def full_code(self, obj):
+        return f"{obj.professional_standard_group.code}.{obj.code}"
+
+    full_code.short_description = "Полный код"
+    full_code.admin_order_field = "code"
 
 
-@admin.register(Competency)
-class CompetencyAdmin(SimpleHistoryAdmin):
-    list_display = ("code", "type", "short_description")
-    search_fields = ("code", "description")
-    list_filter = ("type",)
-
-    def short_description(self, obj):
-        return obj.description[:70] + "..." if len(obj.description) > 70 else obj.description  # noqa: PLR2004
-
-    short_description.short_description = "Описание"
+@admin.register(EduDegree)
+class EduDegreeAdmin(SimpleHistoryAdmin):
+    list_display = ("name", "code")
+    search_fields = ("name", "code")
 
 
-@admin.register(Discipline)
-class DisciplineAdmin(SimpleHistoryAdmin):
-    list_display = ("code", "name")
-    search_fields = ("code", "name")
-    filter_horizontal = ("competencies",)
+@admin.register(FederalStateEducationStandard)
+class FederalStateEducationStandardAdmin(SimpleHistoryAdmin):
+    list_display = ("full_code", "name", "code", "edu_group", "edu_degree")
+    search_fields = ("name", "code", "edu_group__name", "edu_degree__name")
+    list_filter = ("edu_group", "edu_degree")
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "name",
+                    "edu_group",
+                    "edu_degree",
+                    "code",
+                ),
+            },
+        ),
+    )
+
+    def full_code(self, obj):
+        return f"{obj.edu_group.code}.{obj.edu_degree.code}.{obj.code}"
+
+    full_code.short_description = "Полный код"
+    full_code.admin_order_field = "code"
 
 
 @admin.register(Program)
 class ProgramAdmin(SimpleHistoryAdmin):
     list_display = (
+        "full_code",
         "code",
         "name",
         "university",
         "faculty",
-        "qualification",
-        "duration_years",
+        "edu_degree",
         "approval_year",
-        "is_processed",
     )
-    search_fields = ("code", "name", "university__name")
-    readonly_fields = ("processing_error",)
-    actions = ["reprocess_documents"]
+    search_fields = ("code", "name", "university__name", "faculty__name", "edu_group__name")
     list_filter = (
         "university",
-        "qualification",
-        "language",
+        "faculty",
+        "edu_degree",
     )
-    filter_horizontal = (
-        "professional_standards",
-        "disciplines",
-    )
+    filter_horizontal = ("professional_standards",)
     fieldsets = (
         (
             None,
@@ -76,49 +109,21 @@ class ProgramAdmin(SimpleHistoryAdmin):
                 "fields": (
                     "university",
                     "faculty",
-                    "document",
-                    "is_processed",
-                    "code",
                     "name",
+                    "edu_group",
+                    "edu_degree",
+                    "code",
                     "profile",
                     "approval_year",
+                    "professional_standards",
+                    "document",
                 ),
-            },
-        ),
-        (
-            "Квалификация",
-            {
-                "fields": ("qualification", "duration_years", "total_credits"),
-            },
-        ),
-        (
-            "Варианты обучения",
-            {
-                "fields": (
-                    "language",
-                    "contact_hours_min",
-                ),
-            },
-        ),
-        (
-            "Профессиональные стандарты и дисциплины",
-            {
-                "fields": ("professional_standards", "disciplines"),
-            },
-        ),
-        (
-            "Ошибки",
-            {
-                "fields": ("processing_error",),
             },
         ),
     )
 
-    def reprocess_documents(self, request, queryset):
-        for program in queryset:
-            if program.document:
-                program.is_processed = False
-                program.save()
-        self.message_user(request, "Выбранные программы будут обработаны повторно")
+    def full_code(self, obj):
+        return f"{obj.edu_group.code}.{obj.edu_degree.code}.{obj.code}"
 
-    reprocess_documents.short_description = "Переобработать документы"
+    full_code.short_description = "Полный код"
+    full_code.admin_order_field = "code"

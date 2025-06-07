@@ -65,6 +65,20 @@ services:
         condition: service_healthy
     restart: on-failure
 
+  beats:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["celery", "-A", "settings", "beat", "-l", "info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
+    env_file:
+      - .env.dev
+    volumes:
+      - ./app:/app
+    depends_on:
+      celery:
+        condition: service_healthy
+    restart: on-failure
+
   redis:
     image: redis:alpine
     command: ["/bin/sh", "-c", "redis-server --requirepass $${REDIS_PASS:?REDIS_PASS variable is not set}"]

@@ -1,26 +1,10 @@
 from pathlib import Path
 
-from celery import current_app
-from django.db.models.signals import post_delete, post_save
+from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from loguru import logger
 
 from edu_programs.models import Program
-
-
-@receiver(post_save, sender=Program)
-def start_document_processing(sender, instance, created, **kwargs):  # noqa: ARG001
-    """Автоматически запускает обработку документа при его добавлении/изменении."""
-    if instance.processing_error:
-        return
-
-    if instance.document and not instance.is_processed:
-        # Запускаем асинхронную задачу обработки документа
-        current_app.send_task(
-            "edu_programs.tasks.process_uploaded_document",
-            args=[instance.id],
-            queue="documents",
-        )
 
 
 @receiver(post_delete, sender=Program)
