@@ -69,6 +69,18 @@ def make_request(
     return response
 
 
+def remove_brackets(text):
+    # Удаляем содержимое круглых скобок с поддержкой вложенности
+    while re.search(r"\([^()]*\)", text):
+        text = re.sub(r"\([^()]*\)", "", text)
+
+    # Удаляем содержимое квадратных скобок (без вложенности)
+    text = re.sub(r"\[.*?\]", "", text)
+
+    # Удаляем возможные двойные пробелы после удаления
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def download_pdf(url: str, save_path: str):
     try:
         response = make_request(method="GET", url=url, stream=True)
@@ -85,10 +97,19 @@ def download_pdf(url: str, save_path: str):
 def parse_fgos_edu(method: str, url: str, inner_class: str):
     results = []
 
-    for page in range(1, 4):
+    next_page = True
+    page = 1
+    while next_page:
         response = make_request(method=method, url=url, params={"page": page}, request_name="fgos_standards_inner")
         response.encoding = "utf-8"
         soup = BeautifulSoup(response.text, "html.parser")
+        if (
+            page > 15  # noqa: PLR2004
+            or (inner_class == "me-2" and soup.find_next("li", attrs={"class": "page-item next disabled"}))
+            or (inner_class == "w80 me-2" and page > 3)  # noqa: PLR2004
+        ):
+            next_page = False
+
         programs = soup.find_all("div", attrs={"class": "item d-flex"})
 
         for item in programs:
@@ -99,6 +120,7 @@ def parse_fgos_edu(method: str, url: str, inner_class: str):
                     "code": inner_item.find_next("div", attrs={"class": inner_class}).text.strip(".").split(".")[-1],
                 },
             )
+        page += 1
 
     return results
 
@@ -187,21 +209,28 @@ def extract_vsu_education_programs(download=True):
     for tab in tabs:
         try:
             year = tab["id"].replace("tab", "")
-            edu_programs = soup.find_all("tr", attrs={"itemprop": "eduOp"})
+            edu_programs = tab.find_all("tr", attrs={"itemprop": "eduOp"})
 
             for i, item in enumerate(edu_programs):
                 degree = item.find("td", attrs={"itemprop": "eduLevel"}).text
                 if degree.rsplit("–")[-1].strip() not in [elem["name"] for elem in POSSIBLE_DEGREES]:
+                    continue
+                if item.find("td", attrs={"itemprop": "eduForm"}).text != "очная":
                     continue
                 code = item.find("td", attrs={"itemprop": "eduCode"}).text.split(".")
                 group_code, degree_code, code = code[0], code[1], code[2]
                 name = item.find("td", attrs={"itemprop": "eduName"}).text
                 profile = re.findall(r'["\'](.*?)["\']', name)
                 profile = profile[0] if len(profile) > 0 else None
-                name = re.sub(r"\(.*?\)|\[.*?\]", "", name).strip()
-                plan_href = item.find("td", attrs={"itemprop": "educationPlan"}).find_next("a")
+                name = remove_brackets(name).strip()
+                plan_href = item.find("td", attrs={"itemprop": "educationPlan"})
+                plan_href = plan_href.find_next("a") if plan_href.text.lower() != "нет" else None
+                if plan_href is None:
+                    continue
                 plan_href = unquote(plan_href.get("href", ""))
                 plan_name = plan_href.rsplit("/")[-1]
+                if str(plan_name) == "None":
+                    continue
                 file_path = VSU_OP_FILES / plan_name
 
                 if download:

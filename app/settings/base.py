@@ -217,20 +217,26 @@ ANALYTICS_CONFIG = {
 
 
 CELERY_BEAT_SCHEDULE = {
-    "parse_fgos_professional_standards": {
+    "Сбор данных о профессиональных стандартах ФГОС": {
         "task": "edu_programs.tasks.parse_fgos_professional_standards",
-        "schedule": timedelta(days=1),
+        "schedule": timedelta(days=365),
         "options": {"queue": "default"},
         "enabled": False,
     },
-    "parse_fgos_education_standards": {
+    "Сбор данных об образовательных стандартах ФГОС": {
         "task": "edu_programs.tasks.parse_fgos_education_standards",
-        "schedule": timedelta(days=1),
+        "schedule": timedelta(days=365),
         "options": {"queue": "default"},
         "enabled": False,
     },
-    "parse_vsu_education_programs": {
+    "Сбор данных о направлениях подготовки": {
         "task": "edu_programs.tasks.parse_vsu_education_programs",
+        "schedule": timedelta(days=365),
+        "options": {"queue": "default"},
+        "enabled": False,
+    },
+    "Последовательный запуск всех задач сбора данных": {
+        "task": "edu_programs.tasks.initial_setup_tasks",
         "schedule": timedelta(days=1),
         "options": {"queue": "default"},
         "enabled": False,

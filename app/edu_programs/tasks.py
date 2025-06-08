@@ -1,9 +1,8 @@
-import logging
-
 import fitz  # PyMuPDF
-from celery import shared_task
+from celery import chain, shared_task
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.files import File
+from loguru import logger
 
 from edu_programs.models import (
     EducationGroup,
@@ -20,9 +19,6 @@ from edu_programs.parsers.web_parsers import (
     extract_fgos_professional_standards,  # парсинг стандартов с сайта фгос
     extract_vsu_education_programs,  # парсинг с сайта вгу
 )
-
-
-logger = logging.getLogger(__name__)
 
 
 def save_professional_standards(standards_df, program):
@@ -51,7 +47,8 @@ def parse_fgos_professional_standards(self):
             # Проверяем, существует ли уже стандарт с таким кодом
             if not (
                 ProfessionalStandard.objects.filter(
-                    code=data["code"], professional_standard_group__name=data["group_name"]
+                    code=data["code"],
+                    professional_standard_group__name=data["group_name"],
                 )
                 .select_related("professional_standard_group__name")
                 .exists()
@@ -68,7 +65,7 @@ def parse_fgos_professional_standards(self):
                 created_count += 1
 
     except Exception as e:
-        logger.exception(f"Ошибка при парсинге профессиональных стандартов: {e}")  # noqa: TRY401
+        logger.exception(f"Ошибка при парсинге профессиональных стандартов: {e}")
         raise self.retry(exc=e) from None
 
     else:
@@ -86,7 +83,9 @@ def parse_fgos_education_standards(self):
             # Проверяем, существует ли уже стандарт с таким кодом
             if not (
                 FederalStateEducationStandard.objects.filter(
-                    code=data["code"], edu_degree__code=data["degree_code"], edu_group__code=data["group_code"]
+                    code=data["code"],
+                    edu_degree__code=data["degree_code"],
+                    edu_group__code=data["group_code"],
                 )
                 .select_related("edu_degree__code", "edu_group__code")
                 .exists()
@@ -105,7 +104,7 @@ def parse_fgos_education_standards(self):
                 created_count += 1
 
     except Exception as e:
-        logger.exception(f"Ошибка при парсинге образовательных стандартов: {e}")  # noqa: TRY401
+        logger.exception(f"Ошибка при парсинге образовательных стандартов: {e}")
         raise self.retry(exc=e) from None
 
     else:
@@ -115,36 +114,38 @@ def parse_fgos_education_standards(self):
 @shared_task(bind=True)
 def parse_vsu_education_programs(self):  # noqa: ARG001
     """Создает модели Program на основе данных с сайта ВУЗа."""
-    programs_data = extract_vsu_education_programs()
+    programs_data = extract_vsu_education_programs(download=True)
     university = University.objects.get(abbreviation="ВГУ")
 
     created_count = 0
+
     for data in programs_data:
-        # Проверяем, существует ли уже программа с таким кодом
+        # Проверяем, существует ли уже программа с такими же данными
         try:
+            with fitz.open(data["file_path"]) as doc:
+                page_text = doc[0].get_text(sort=True)
+                if not page_text:
+                    logger.info(f"{data['file_path']} | нет текста на странице")
+                    continue
+                document_parse_data = vsu_document_parser(page_text, university)
+
+            if "faculty" not in document_parse_data:
+                logger.warning(f"Факультет не найден | {data['file_path'].stem}")
+                continue
+
             if not (
                 Program.objects.filter(
                     code=data["code"],
                     edu_degree__code=data["degree_code"],
                     edu_group__code=data["group_code"],
                     profile=data.get("profile", ""),
+                    approval_year=int(data.get("year")),
+                    faculty__name=document_parse_data["faculty"],
                 )
                 .select_related("edu_degree__code", "edu_group__code")
                 .exists()
-                and data.get("file_path")
-            ):
-                data["file_path"].unlink()
-
-                with fitz.open(data["file_path"]) as doc:
-                    page_text = doc[0].get_text(sort=True)
-                    if not page_text:
-                        logger.info(f"{data['file_path']} | нет текста на странице")
-                        continue
-                    document_parse_data = vsu_document_parser(page_text, university)
-
-                if "faculty" not in document_parse_data:
-                    logger.warning(f"Факультет не найден | {data['file_path'].stem}")
-                    continue
+            ) and data.get("file_path"):
+                # data["file_path"].unlink()  # noqa: ERA001
 
                 try:
                     edu_group = EducationGroup.objects.get(code=data["group_code"])
@@ -173,10 +174,26 @@ def parse_vsu_education_programs(self):  # noqa: ARG001
                 program.save()
 
         except Exception as e:
-            logger.exception(f"Ошибка при парсинге образовательных программ: {e}")  # noqa: TRY401
+            logger.exception(f"Ошибка при парсинге образовательных программ: {e}")
             continue
 
     return f"Создано {created_count} образовательных программ"
+
+
+@shared_task(bind=True)
+def initial_setup_tasks(self):
+    """Выполняет все задачи сбора данных последовательно."""
+    try:
+        chain(
+            parse_fgos_professional_standards.s(),
+            parse_fgos_education_standards.s(),
+            parse_vsu_education_programs.s(),
+        ).apply_async(queue="default")
+    except Exception as e:
+        logger.exception(f"Ошибка при выполнении начальных задач: {e}")
+        raise self.retry(exc=e) from None
+    else:
+        return "Все начальные задачи успешно запущены"
 
 
 # Порядок запуска

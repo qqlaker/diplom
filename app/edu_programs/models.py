@@ -100,7 +100,10 @@ class FederalStateEducationStandard(BaseModel):  # образовательны�
         verbose_name=_("Обобщенная группа образовательных программ"),
     )
     edu_degree = models.ForeignKey(
-        EduDegree, verbose_name=_("Степень образования"), on_delete=models.CASCADE, blank=True
+        EduDegree,
+        verbose_name=_("Степень образования"),
+        on_delete=models.CASCADE,
+        blank=True,
     )
     code = models.CharField(_("Код"), max_length=20)
 
@@ -124,7 +127,10 @@ class Program(BaseModel):  # образовательные программы �
         verbose_name=_("Обобщенная группа образовательных программ"),
     )
     edu_degree = models.ForeignKey(
-        EduDegree, verbose_name=_("Степень образования"), on_delete=models.CASCADE, blank=True
+        EduDegree,
+        verbose_name=_("Степень образования"),
+        on_delete=models.CASCADE,
+        blank=True,
     )
     code = models.CharField(_("Код"), max_length=20)
     university = models.ForeignKey(University, on_delete=models.CASCADE, verbose_name=_("ВУЗ"))
@@ -151,6 +157,7 @@ class Program(BaseModel):  # образовательные программы �
         storage=opop_storage,
         blank=True,
         null=True,
+        max_length=500,
     )
 
     class Meta:

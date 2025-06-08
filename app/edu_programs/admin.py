@@ -90,6 +90,7 @@ class ProgramAdmin(SimpleHistoryAdmin):
         "full_code",
         "code",
         "name",
+        "profile",
         "university",
         "faculty",
         "edu_degree",
