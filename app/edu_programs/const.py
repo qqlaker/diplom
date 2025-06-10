@@ -14,3 +14,4 @@ POSSIBLE_DEGREES = [
 ]
 ALLOWED_PROF_STANDARDS = ["06"]
 ALLOWED_EDU_STANDARDS = ["01", "02", "09"]
+ALLOWED_FACULTIES = ["компьютерных наук", "математический", "прикладной математики, информатики и механики"]

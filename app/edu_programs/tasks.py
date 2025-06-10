@@ -4,6 +4,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.files import File
 from loguru import logger
 
+from edu_programs.const import ALLOWED_FACULTIES
 from edu_programs.models import (
     EducationGroup,
     EduDegree,
@@ -131,6 +132,9 @@ def parse_vsu_education_programs(self):  # noqa: ARG001
 
             if "faculty" not in document_parse_data:
                 logger.warning(f"Факультет не найден | {data['file_path'].stem}")
+                continue
+
+            if document_parse_data["faculty"].name.lower() not in ALLOWED_FACULTIES:
                 continue
 
             if not (
