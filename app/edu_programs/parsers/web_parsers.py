@@ -114,6 +114,16 @@ def parse_fgos_edu(method: str, url: str, inner_class: str):
 
         for item in programs:
             inner_item = item.find_next("div", attrs={"class": "d-flex"})
+            full_code = inner_item.find_next("div", attrs={"class": inner_class}).text.strip(".").split(".")
+
+            if inner_class == "me-2":  # noqa: SIM102
+                if not (
+                    ALLOWED_PROF_STANDARDS[full_code[0]] == "all"
+                    or full_code[1] in ALLOWED_PROF_STANDARDS[full_code[0]]
+                ):
+                    continue
+
+            inner_item = item.find_next("div", attrs={"class": "d-flex"})
             results.append(
                 {
                     "name": inner_item.find_all("div")[2].text,
