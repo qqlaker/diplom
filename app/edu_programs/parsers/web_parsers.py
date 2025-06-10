@@ -7,7 +7,7 @@ import requests
 from bs4 import BeautifulSoup
 from loguru import logger
 
-from edu_programs.const import POSSIBLE_DEGREES, VSU_OP_FILES
+from edu_programs.const import ALLOWED_EDU_STANDARDS, ALLOWED_PROF_STANDARDS, POSSIBLE_DEGREES, VSU_OP_FILES
 
 
 def make_request(
@@ -144,6 +144,9 @@ def extract_fgos_education_standards():
 
         for item in fgos_programs:
             group_code = item.find_next("div", attrs={"class": "w112 text-green align-middle"}).text[:2]
+            if group_code not in ALLOWED_EDU_STANDARDS:
+                continue
+
             item_link = item.find_next("a", attrs={"class": "item-link"})
             group_name = item_link.text.lower().capitalize()
             url = f"https://fgosvo.ru{item_link['href']}"
@@ -179,6 +182,8 @@ def extract_fgos_professional_standards():
 
         for item in fgos_standards:
             group_code = item.find_next("div", attrs={"class": "w80 text-green align-middle"}).text
+            if group_code not in ALLOWED_PROF_STANDARDS:
+                continue
             item_link = item.find_next("a", attrs={"class": "item-link"})
             group_name = item_link.text.lower().capitalize()
             url = f"https://fgosvo.ru{item_link['href']}"

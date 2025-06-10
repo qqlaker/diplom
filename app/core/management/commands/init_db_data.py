@@ -22,24 +22,9 @@ class Command(BaseCommand):
 
         # Создаем факультеты
         faculties_data = [
-            {"name": "Медико-биологический", "abbreviation": "БиоМедФак"},
-            {"name": "Военный учебный центр", "abbreviation": "ВУЦ"},
-            {"name": "Географии, геоэкологии и туризма", "abbreviation": "ГГиТ"},
-            {"name": "Геологический", "abbreviation": "ГеоФак"},
-            {"name": "Журналистики", "abbreviation": "ЖурФак"},
-            {"name": "Исторический", "abbreviation": "ИстФак"},
             {"name": "Компьютерных наук", "abbreviation": "ФКН"},
             {"name": "Математический", "abbreviation": "МатФак"},
-            {"name": "Международных отношений", "abbreviation": "ФМО"},
             {"name": "Прикладной математики, информатики и механики", "abbreviation": "ПММ"},
-            {"name": "Романо-германской филологии", "abbreviation": "РГФ"},
-            {"name": "Химический", "abbreviation": "ХимФак"},
-            {"name": "Фармацевтический", "abbreviation": "Фармацевт"},
-            {"name": "Физический", "abbreviation": "ФизФак"},
-            {"name": "Филологический", "abbreviation": "ФилФак"},
-            {"name": "Философии и психологии", "abbreviation": "ФиПси"},
-            {"name": "Экономический", "abbreviation": "Эконом"},
-            {"name": "Юридический", "abbreviation": "ЮрФак"},
         ]
 
         created_faculties = 0
